@@ -40,11 +40,13 @@ def fetch_amazon_product_page(url: str, query: str) -> str:
         soup = BeautifulSoup(resp.text, "html.parser")
 
         # --- List of potential selectors to find the product link ---
-        # We will try these in order.
+        # Updated selectors based on current Amazon structure (2025)
         selectors = [
-            'div[data-asin] h2 a.a-link-normal',  # Primary, most common selector for product titles
-            'a.a-link-normal.s-underline-text.s-underline-link-text.s-link-style.a-text-normal', # A common fallback
-            'div[data-asin] a[href*="/dp/"]' # A broad selector looking for any product link inside a result
+            'div[data-component-type="s-search-result"] h2 a',  # Modern Amazon search result structure
+            'a[href*="/dp/"]',  # Simple and reliable - matches any product link
+            'div[data-asin] h2 a',  # Legacy selector for data-asin containers
+            'h2.a-size-mini a',  # Alternative title link selector
+            '[data-component-type="s-search-result"] a[href*="/dp/"]'  # Specific search result links
         ]
 
         link_tag = None
@@ -52,12 +54,16 @@ def fetch_amazon_product_page(url: str, query: str) -> str:
             link_tag = soup.select_one(selector)
             if link_tag:
                 # If we found a link with this selector, stop searching
-                print(f"Found product link using selector: '{selector}'") # Debug message
+                print(f"Found product link using selector: '{selector}'", file=sys.stderr) # Debug message
                 break
         
         if link_tag and link_tag.get('href'):
             # The scraped link is often relative, so we join it with the base URL.
-            product_link = urljoin('https://www.amazon.com', link_tag['href'])
+            href = link_tag['href']
+            if href.startswith('/'):
+                product_link = f'https://www.amazon.com{href}'
+            else:
+                product_link = href
             return product_link
             
         # If none of the selectors worked
